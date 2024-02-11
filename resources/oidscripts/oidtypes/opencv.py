@@ -70,110 +70,115 @@ class Mat(interface.TypeInspectorInterface):
         buffer you are working with). Make sure to check for pointers of your
         type as well
         """
-        # Check if symbol type is the expected buffer
         symbol_type = str(symbol.type)
         type_regex = r'(const\s+)?cv::Mat(\s+?[*&])?$'
-        result = re.match(type_regex, symbol_type)
-        print(f'symbol {symbol}, name {symbol_name}, type {symbol_type}')
-        return result is not None
+        print(f'symbol {symbol_name}, type {symbol_type}', end=' ')
+        result = all(symbol.has_member(m) for m in ['data', 'cols', 'rows', 'flags', 'step'])
+        print(f'has members {result}', end=' ')
+        if result:
+            magic = int(symbol['flags']) & 0xFFFF0000
+            result = magic == 0x42FF0000  # https://docs.opencv.org/3.4/d3/d63/classcv_1_1Mat.html
+        print(f'observable {result}')
+        return result
 
 class CvMat(interface.TypeInspectorInterface):
-    """
-    Implementation for inspecting OpenCV CvMat structs
-    """
-    def get_buffer_metadata(self, obj_name, picked_obj, debugger_bridge):
-        data = picked_obj['data']
-        if data.type == 'CvMat::(unnamed union)':
-            data = data[0]
-        buffer = debugger_bridge.get_casted_pointer('char', data)
-        if buffer == 0x0:
-            raise Exception('Received null buffer!')
+   """
+   Implementation for inspecting OpenCV CvMat structs
+   """
+   def get_buffer_metadata(self, obj_name, picked_obj, debugger_bridge):
+       data = picked_obj['data']
+       if data.type == 'CvMat::(unnamed union)':
+           data = data[0]
+       buffer = debugger_bridge.get_casted_pointer('char', data)
+       if buffer == 0x0:
+           raise Exception('Received null buffer!')
 
-        width = int(picked_obj['cols'])
-        height = int(picked_obj['rows'])
-        flags = int(picked_obj['type'])
+       width = int(picked_obj['cols'])
+       height = int(picked_obj['rows'])
+       flags = int(picked_obj['type'])
 
-        channels = ((((flags) & CV_MAT_CN_MASK) >> CV_CN_SHIFT) + 1)
-        row_stride = int(int(picked_obj['step'])/channels)
+       channels = ((((flags) & CV_MAT_CN_MASK) >> CV_CN_SHIFT) + 1)
+       row_stride = int(int(picked_obj['step'])/channels)
 
-        if channels >= 3:
-            pixel_layout = 'bgra'
-        else:
-            pixel_layout = 'rgba'
+       if channels >= 3:
+           pixel_layout = 'bgra'
+       else:
+           pixel_layout = 'rgba'
 
-        cvtype = ((flags) & CV_MAT_TYPE_MASK)
+       cvtype = ((flags) & CV_MAT_TYPE_MASK)
 
-        type_value = (cvtype & 7)
+       type_value = (cvtype & 7)
 
-        if (type_value == symbols.OID_TYPES_UINT16 or
-            type_value == symbols.OID_TYPES_INT16):
-            row_stride = int(row_stride / 2)
-        elif (type_value == symbols.OID_TYPES_INT32 or
-              type_value == symbols.OID_TYPES_FLOAT32):
-            row_stride = int(row_stride / 4)
-        elif type_value == symbols.OID_TYPES_FLOAT64:
-            row_stride = int(row_stride / 8)
+       if (type_value == symbols.OID_TYPES_UINT16 or
+           type_value == symbols.OID_TYPES_INT16):
+           row_stride = int(row_stride / 2)
+       elif (type_value == symbols.OID_TYPES_INT32 or
+             type_value == symbols.OID_TYPES_FLOAT32):
+           row_stride = int(row_stride / 4)
+       elif type_value == symbols.OID_TYPES_FLOAT64:
+           row_stride = int(row_stride / 8)
 
-        return {
-            'display_name': f'{obj_name} ({picked_obj.type})',
-            'pointer': buffer,
-            'width': width,
-            'height': height,
-            'channels': channels,
-            'type': type_value,
-            'row_stride': row_stride,
-            'pixel_layout': pixel_layout,
-            'transpose_buffer': False
-        }
+       return {
+           'display_name': f'{obj_name} ({picked_obj.type})',
+           'pointer': buffer,
+           'width': width,
+           'height': height,
+           'channels': channels,
+           'type': type_value,
+           'row_stride': row_stride,
+           'pixel_layout': pixel_layout,
+           'transpose_buffer': False
+       }
 
-    def is_symbol_observable(self, symbol, symbol_name):
-        symbol_type = str(symbol.type)
-        type_regex = r'(const\s+)?CvMat(\s+?[*&])?'
-        result = re.match(type_regex, symbol_type) 
-        return result is not None
+   def is_symbol_observable(self, symbol, symbol_name):
+       symbol_type = str(symbol.type)
+       type_regex = r'(const\s+)?CvMat(\s+?[*&])?'
+       result = re.match(type_regex, symbol_type) 
+       return result is not None
 
 
 class IplImage(interface.TypeInspectorInterface):
-    """
-    Implementation for inspecting OpenCV IplImage structs
-    """
+   """
+   Implementation for inspecting OpenCV IplImage structs
+   """
 
-    types = {8: symbols.OID_TYPES_UINT8, 0x80000008: symbols.OID_TYPES_UINT8, 
-             16: symbols.OID_TYPES_UINT16, 0x80000010: symbols.OID_TYPES_INT16,
-             32: symbols.OID_TYPES_FLOAT32,
-             64: symbols.OID_TYPES_FLOAT64}
+   types = {8: symbols.OID_TYPES_UINT8, 0x80000008: symbols.OID_TYPES_UINT8, 
+            16: symbols.OID_TYPES_UINT16, 0x80000010: symbols.OID_TYPES_INT16,
+            32: symbols.OID_TYPES_FLOAT32,
+            64: symbols.OID_TYPES_FLOAT64}
 
-    def get_buffer_metadata(self, obj_name, picked_obj, debugger_bridge):
-        buffer = debugger_bridge.get_casted_pointer('char', picked_obj['imageData'])
-        if buffer == 0x0:
-            raise Exception('Received null buffer!')
+   def get_buffer_metadata(self, obj_name, picked_obj, debugger_bridge):
+       buffer = debugger_bridge.get_casted_pointer('char', picked_obj['imageData'])
+       if buffer == 0x0:
+           raise Exception('Received null buffer!')
 
-        width = int(picked_obj['width'])
-        height = int(picked_obj['height'])
-        channels = int(picked_obj['nChannels'])
-        depth = int(picked_obj['depth'])
-        row_stride = int(int(picked_obj['widthStep']) / depth * 8)
+       width = int(picked_obj['width'])
+       height = int(picked_obj['height'])
+       channels = int(picked_obj['nChannels'])
+       depth = int(picked_obj['depth'])
+       row_stride = int(int(picked_obj['widthStep']) / depth * 8)
 
-        if channels >= 3:
-            pixel_layout = 'bgra'
-        else:
-            pixel_layout = 'rgba'
+       if channels >= 3:
+           pixel_layout = 'bgra'
+       else:
+           pixel_layout = 'rgba'
 
-        return {
-            'display_name': f'{obj_name} ({picked_obj.type})',
-            'pointer': buffer,
-            'width': width,
-            'height': height,
-            'channels': channels,
-            'type': self.types[depth],
-            'row_stride': row_stride,
-            'pixel_layout': pixel_layout,
-            'transpose_buffer': False
-        }
+       return {
+           'display_name': f'{obj_name} ({picked_obj.type})',
+           'pointer': buffer,
+           'width': width,
+           'height': height,
+           'channels': channels,
+           'type': self.types[depth],
+           'row_stride': row_stride,
+           'pixel_layout': pixel_layout,
+           'transpose_buffer': False
+       }
 
-    def is_symbol_observable(self, symbol, symbol_name):
-        symbol_type = str(symbol.type)
-        type_regex = r'(const\s+)?IplImage(\s+?[*&])?'
-        result = re.match(type_regex, symbol_type) is not None
-        return result
+   def is_symbol_observable(self, symbol, symbol_name):
+       symbol_type = str(symbol.type)
+       type_regex = r'(const\s+)?IplImage(\s+?[*&])?'
+       result = re.match(type_regex, symbol_type) is not None
+       return result
+
 
