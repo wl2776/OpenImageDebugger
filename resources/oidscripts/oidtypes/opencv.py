@@ -73,7 +73,9 @@ class Mat(interface.TypeInspectorInterface):
         # Check if symbol type is the expected buffer
         symbol_type = str(symbol.type)
         type_regex = r'(const\s+)?cv::Mat(\s+?[*&])?$'
-        return re.match(type_regex, symbol_type) is not None
+        result = re.match(type_regex, symbol_type)
+        print(f'symbol {symbol}, name {symbol_name}, type {symbol_type}')
+        return result is not None
 
 class CvMat(interface.TypeInspectorInterface):
     """
@@ -127,7 +129,8 @@ class CvMat(interface.TypeInspectorInterface):
     def is_symbol_observable(self, symbol, symbol_name):
         symbol_type = str(symbol.type)
         type_regex = r'(const\s+)?CvMat(\s+?[*&])?'
-        return re.match(type_regex, symbol_type) is not None
+        result = re.match(type_regex, symbol_type) 
+        return result is not None
 
 
 class IplImage(interface.TypeInspectorInterface):
