@@ -238,6 +238,9 @@ class SymbolWrapper(DebuggerSymbolReference):
 
         return SymbolWrapper(child)
 
+    def has_member(self, member):
+        return self._symbol.GetChildMemberWithName(member).IsValid()
+
     def get_casted_pointer(self):
         if self._symbol.TypeIsPointerType():
             buff_addr = self._symbol.GetValueAsUnsigned()
