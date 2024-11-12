@@ -74,11 +74,11 @@ class Mat(interface.TypeInspectorInterface):
         type_regex = r'(const\s+)?cv::Mat(\s+?[*&])?$'
         print(f'symbol {symbol_name}, type {symbol_type}', end=' ')
         result = all(symbol.has_member(m) for m in ['data', 'cols', 'rows', 'flags', 'step'])
-        print(f'has members {result}', end=' ')
+        # print(f'has members {result}', end=' ')
         if result:
             magic = int(symbol['flags']) & 0xFFFF0000
             result = magic == 0x42FF0000  # https://docs.opencv.org/3.4/d3/d63/classcv_1_1Mat.html
-        print(f'observable {result}')
+        # print(f'observable {result}')
         return result
 
 class CvMat(interface.TypeInspectorInterface):
